@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scholarrank"
+version = "0.1.0"
+description = "TUI tool for matching international scholarships."
+requires-python = ">=3.10"
+dependencies = [
+    "textual",
+    "httpx",
+    "beautifulsoup4",
+    "lxml",
+    "openai",
+    "pyyaml",
+    "crawlee",
+    "playwright",
+]
