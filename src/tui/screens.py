@@ -634,11 +634,9 @@ class MainScreen(Screen):
             case CommandType.PROFILE:
                 self._show_profile()
             case CommandType.FETCH:
-                output.write("[yellow]Fetching not yet implemented.[/yellow]")
-                output.write("This will be added in Phase 3 (Tasks 7-12).")
+                asyncio.create_task(self._run_fetch())
             case CommandType.SOURCES:
-                output.write("[yellow]Sources list not yet implemented.[/yellow]")
-                output.write("This will be added in Phase 7 (Task 20).")
+                self._show_sources()
             case CommandType.MATCH:
                 self._run_match()
             case CommandType.INFO:
@@ -650,11 +648,9 @@ class MainScreen(Screen):
                 filename = result.args[0] if result.args else "matches.json"
                 self._save_matches(filename)
             case CommandType.STATS:
-                output.write("[yellow]Stats not yet implemented.[/yellow]")
-                output.write("This will be added in Phase 7 (Task 20).")
+                self._show_stats()
             case CommandType.CLEAN:
-                output.write("[yellow]Clean not yet implemented.[/yellow]")
-                output.write("This will be added in Phase 7 (Task 20).")
+                self._clean_expired()
             case _:
                 output.write(f"[red]Unhandled command: {result.command_type}[/red]")
 
@@ -851,3 +847,287 @@ class MainScreen(Screen):
         except Exception as e:
             output.write(f"[red]Unexpected error: {e}[/red]")
             output.write("")
+
+    async def _run_fetch(self) -> None:
+        """Run all scrapers and save results to database."""
+        output = self.query_one("#output-log", RichLog)
+        
+        output.write("[bold cyan]Fetching scholarships from all sources...[/bold cyan]")
+        output.write("")
+        
+        # Import scrapers and database
+        from src.scrapers import (
+            FastwebScraper,
+            ScholarshipsComScraper,
+            CareerOneStopScraper,
+            IEFAScraper,
+            InternationalScholarshipsComScraper,
+            Scholars4devScraper,
+        )
+        from src.storage.database import get_session
+        from src.storage.models import Scholarship, FetchLog
+        from datetime import datetime
+        import hashlib
+        
+        scrapers = [
+            ("Fastweb", FastwebScraper()),
+            ("Scholarships.com", ScholarshipsComScraper()),
+            ("CareerOneStop", CareerOneStopScraper()),
+            ("IEFA", IEFAScraper()),
+            ("InternationalScholarships", InternationalScholarshipsComScraper()),
+            ("Scholars4dev", Scholars4devScraper()),
+        ]
+        
+        total_new = 0
+        total_found = 0
+        results = []
+        
+        for source_name, scraper in scrapers:
+            output.write(f"[dim]  Fetching from {source_name}...[/dim]")
+            
+            try:
+                scholarships = await scraper.scrape()
+                count = len(scholarships)
+                total_found += count
+                
+                # Save to database
+                new_count = 0
+                for session in get_session():
+                    for s in scholarships:
+                        # Generate unique ID
+                        id_string = f"{scraper.name}:{s.get('title', '')}:{s.get('url', '')}"
+                        scholarship_id = hashlib.md5(id_string.encode()).hexdigest()[:16]
+                        
+                        # Check if exists
+                        existing = session.query(Scholarship).filter_by(id=scholarship_id).first()
+                        
+                        if existing:
+                            # Update last_seen_at
+                            existing.last_seen_at = datetime.utcnow()
+                        else:
+                            # Parse amount
+                            amount = s.get("amount")
+                            amount_min = None
+                            amount_max = None
+                            if isinstance(amount, int):
+                                amount_max = amount * 100  # Convert to cents
+                            elif isinstance(amount, str):
+                                try:
+                                    amount_max = int(amount.replace("$", "").replace(",", "")) * 100
+                                except ValueError:
+                                    pass
+                            
+                            # Create new scholarship
+                            new_scholarship = Scholarship(
+                                id=scholarship_id,
+                                source=scraper.name,
+                                source_id=s.get("source_id"),
+                                title=s.get("title", "Unknown"),
+                                description=s.get("description"),
+                                amount_min=amount_min,
+                                amount_max=amount_max,
+                                deadline=None,  # Would need to parse date
+                                application_url=s.get("url"),
+                                raw_eligibility="\n".join(s.get("requirements", [])) if s.get("requirements") else None,
+                            )
+                            session.add(new_scholarship)
+                            new_count += 1
+                    
+                    # Log the fetch
+                    fetch_log = FetchLog(
+                        source=scraper.name,
+                        scholarships_found=count,
+                        scholarships_new=new_count,
+                    )
+                    session.add(fetch_log)
+                
+                total_new += new_count
+                status = f"[green]✓[/green] {count} found, {new_count} new"
+                results.append((source_name, status, None))
+                
+            except Exception as e:
+                error_msg = str(e)[:50]
+                status = f"[red]✗[/red] Error: {error_msg}"
+                results.append((source_name, status, error_msg))
+                
+                # Log the error
+                for session in get_session():
+                    fetch_log = FetchLog(
+                        source=scraper.name,
+                        scholarships_found=0,
+                        scholarships_new=0,
+                        errors=str(e),
+                    )
+                    session.add(fetch_log)
+        
+        # Show results
+        output.write("")
+        output.write("[bold]Fetch Results:[/bold]")
+        for source_name, status, _ in results:
+            output.write(f"  {source_name}: {status}")
+        
+        output.write("")
+        output.write(f"[bold green]Total: {total_found} scholarships found, {total_new} new[/bold green]")
+        output.write("")
+        output.write("Run [bold]/match[/bold] to find scholarships matching your profile.")
+        output.write("")
+
+    def _show_sources(self) -> None:
+        """Show available sources and their status."""
+        output = self.query_one("#output-log", RichLog)
+        
+        from src.storage.database import get_session
+        from src.storage.models import FetchLog
+        from sqlalchemy import func
+        
+        output.write("[bold]Scholarship Sources[/bold]")
+        output.write("")
+        
+        sources = [
+            ("fastweb", "Fastweb", "API (fallback sample)"),
+            ("scholarships_com", "Scholarships.com", "Playwright browser"),
+            ("careeronestop", "CareerOneStop", "HTTP scraping"),
+            ("iefa", "IEFA", "HTTP scraping"),
+            ("intl_scholarships", "InternationalScholarships", "HTTP scraping"),
+            ("scholars4dev", "Scholars4dev", "HTTP scraping"),
+        ]
+        
+        for session in get_session():
+            for source_id, source_name, method in sources:
+                # Get last fetch info
+                last_fetch = (
+                    session.query(FetchLog)
+                    .filter_by(source=source_id)
+                    .order_by(FetchLog.fetched_at.desc())
+                    .first()
+                )
+                
+                if last_fetch:
+                    time_ago = self._format_time_ago(last_fetch.fetched_at)
+                    if last_fetch.errors:
+                        status = f"[red]Error[/red] ({time_ago})"
+                    else:
+                        status = f"[green]{last_fetch.scholarships_found}[/green] scholarships ({time_ago})"
+                else:
+                    status = "[dim]Never fetched[/dim]"
+                
+                output.write(f"  [cyan]{source_name}[/cyan] [{method}]")
+                output.write(f"    Status: {status}")
+        
+        output.write("")
+        output.write("Run [bold]/fetch[/bold] to update all sources.")
+        output.write("")
+
+    def _show_stats(self) -> None:
+        """Show database statistics."""
+        output = self.query_one("#output-log", RichLog)
+        
+        from src.storage.database import get_session
+        from src.storage.models import Scholarship, FetchLog
+        from sqlalchemy import func
+        from datetime import datetime, timedelta
+        
+        output.write("[bold]Database Statistics[/bold]")
+        output.write("")
+        
+        for session in get_session():
+            # Total scholarships
+            total = session.query(func.count(Scholarship.id)).scalar() or 0
+            output.write(f"  Total scholarships: [bold]{total}[/bold]")
+            
+            # By source
+            output.write("")
+            output.write("  [cyan]By Source:[/cyan]")
+            source_counts = (
+                session.query(Scholarship.source, func.count(Scholarship.id))
+                .group_by(Scholarship.source)
+                .all()
+            )
+            for source, count in source_counts:
+                output.write(f"    {source}: {count}")
+            
+            # With parsed eligibility
+            parsed_count = (
+                session.query(func.count(Scholarship.id))
+                .filter(Scholarship.parsed_eligibility.isnot(None))
+                .scalar() or 0
+            )
+            output.write("")
+            output.write(f"  With parsed eligibility: [bold]{parsed_count}[/bold] ({parsed_count * 100 // max(total, 1)}%)")
+            
+            # With deadlines
+            deadline_count = (
+                session.query(func.count(Scholarship.id))
+                .filter(Scholarship.deadline.isnot(None))
+                .scalar() or 0
+            )
+            output.write(f"  With deadlines: [bold]{deadline_count}[/bold]")
+            
+            # Recent fetches
+            output.write("")
+            output.write("  [cyan]Recent Fetches:[/cyan]")
+            recent_fetches = (
+                session.query(FetchLog)
+                .order_by(FetchLog.fetched_at.desc())
+                .limit(5)
+                .all()
+            )
+            if recent_fetches:
+                for fetch in recent_fetches:
+                    time_ago = self._format_time_ago(fetch.fetched_at)
+                    if fetch.errors:
+                        output.write(f"    [red]✗[/red] {fetch.source}: Error ({time_ago})")
+                    else:
+                        output.write(f"    [green]✓[/green] {fetch.source}: {fetch.scholarships_found} found ({time_ago})")
+            else:
+                output.write("    [dim]No fetches yet[/dim]")
+        
+        output.write("")
+
+    def _format_time_ago(self, dt) -> str:
+        """Format a datetime as relative time (e.g., '2 hours ago')."""
+        from datetime import datetime
+        
+        now = datetime.utcnow()
+        diff = now - dt
+        
+        if diff.days > 0:
+            return f"{diff.days}d ago"
+        elif diff.seconds >= 3600:
+            hours = diff.seconds // 3600
+            return f"{hours}h ago"
+        elif diff.seconds >= 60:
+            minutes = diff.seconds // 60
+            return f"{minutes}m ago"
+        else:
+            return "just now"
+
+    def _clean_expired(self) -> None:
+        """Remove expired scholarships from database."""
+        output = self.query_one("#output-log", RichLog)
+        
+        from src.storage.database import get_session
+        from src.storage.models import Scholarship
+        from datetime import date
+        
+        output.write("[bold]Cleaning expired scholarships...[/bold]")
+        output.write("")
+        
+        removed_count = 0
+        for session in get_session():
+            today = date.today()
+            expired = (
+                session.query(Scholarship)
+                .filter(Scholarship.deadline < today)
+                .all()
+            )
+            
+            removed_count = len(expired)
+            for scholarship in expired:
+                session.delete(scholarship)
+        
+        if removed_count > 0:
+            output.write(f"[green]Removed {removed_count} expired scholarships.[/green]")
+        else:
+            output.write("[dim]No expired scholarships found.[/dim]")
+        output.write("")

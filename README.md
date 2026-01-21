@@ -33,6 +33,9 @@ scholarrank
 | `/init`        | Create/update your profile via AI interview |
 | `/profile`     | Show current profile                        |
 | `/fetch`       | Fetch scholarships from all sources         |
+| `/sources`     | Show scholarship sources and status         |
+| `/stats`       | Show database statistics                    |
+| `/clean`       | Remove expired scholarships from database   |
 | `/match`       | Find matching scholarships                  |
 | `/save [file]` | Export matches to JSON/CSV/Markdown         |
 | `/help`        | Show all commands                           |
