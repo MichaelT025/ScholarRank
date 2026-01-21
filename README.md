@@ -30,6 +30,15 @@ scholarrank
 | `/help`        | Show all commands                           |
 | `/quit`        | Exit                                        |
 
+## Supported Sources
+
+- **Fastweb**: 1.5M+ scholarships (API with fallback)
+- **Scholarships.com**: 3.7M+ scholarships
+- **CareerOneStop**: 9,500+ US Government source
+- **IEFA**: International Education Financial Aid
+- **InternationalScholarships.com**: For international students
+- **Scholars4dev**: Global South & International focus
+
 ## Requirements
 
 - Python 3.10+
