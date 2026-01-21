@@ -2,6 +2,13 @@
 
 A TUI application that aggregates scholarships from multiple sources, uses AI to parse eligibility requirements, and matches them against your profile.
 
+## Key Features
+
+- **AI Extraction**: Uses GPT-4o-mini to parse unstructured eligibility text into structured attributes.
+- **Smart Matching**: Evaluates eligibility with hard and soft filters (GPA, citizenship, major, etc.).
+- **Fit Scoring**: Ranks scholarships based on criteria match, deadline urgency, value density, and competition.
+- **Deduplication**: Automatically identifies and merges identical scholarships across different platforms.
+
 ## Installation
 
 ```bash
