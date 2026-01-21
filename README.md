@@ -4,7 +4,8 @@ A TUI application that aggregates scholarships from multiple sources, uses AI to
 
 ## Key Features
 
-- **AI Extraction**: Uses GPT-4o-mini to parse unstructured eligibility text into structured attributes.
+- **Modern TUI**: Beautiful terminal interface with a "Zen" theme, tabbed views, and interactive modals.
+- **AI-Powered Interview**: Conversational chat interface to build your profile naturally.
 - **Smart Matching**: Evaluates eligibility with hard and soft filters (GPA, citizenship, major, etc.).
 - **Fit Scoring**: Ranks scholarships based on criteria match, deadline urgency, value density, and competition.
 - **Deduplication**: Automatically identifies and merges identical scholarships across different platforms.
@@ -55,7 +56,7 @@ First-run flow in the TUI:
 
 1. Run `/init` to complete the AI profile interview.
 2. Run `/fetch` to pull scholarships from all sources.
-3. Run `/match` to rank scholarships against your profile.
+3. Run `/match` to view ranked scholarships in a tabbed interface.
 4. Run `/save` to export results (JSON, CSV, or Markdown).
 
 ## Usage

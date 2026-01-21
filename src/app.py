@@ -11,6 +11,7 @@ class ScholarRankApp(App):
 
     TITLE = "ScholarRank"
     SUB_TITLE = "Scholarship Matching Tool"
+    CSS_PATH = "tui/app.tcss"
 
     BINDINGS = [
         ("ctrl+q", "quit", "Quit"),

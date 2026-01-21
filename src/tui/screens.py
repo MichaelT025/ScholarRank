@@ -5,15 +5,17 @@ import os
 from typing import Any, Dict, List, Optional
 
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical
+from textual.containers import Center, Container, Vertical, Horizontal, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.widgets import Footer, Header, Input, LoadingIndicator, RichLog, Static, ProgressBar, TabbedContent, TabPane
 
 from src.config import load_profile, save_profile, profile_exists
 from src.profile.models import UserProfile
 from src.tui.commands import CommandParser, CommandResult, CommandType
+from src.tui.components import ChatBubble
 from src.tui.widgets import MatchContainer, MatchTable
 from src.output import export_scholarships
+from src.tui.modals import DetailModal
 
 
 class InterviewScreen(Screen):
@@ -41,13 +43,14 @@ class InterviewScreen(Screen):
 
     #interview-container {
         height: 1fr;
-        border: solid $secondary;
-        padding: 1 2;
+        border: round $primary;
+        padding: 0 0;
     }
 
     #interview-log {
         height: 100%;
         scrollbar-gutter: stable;
+        padding: 1 2;
     }
 
     #interview-input-container {
@@ -66,6 +69,24 @@ class InterviewScreen(Screen):
         color: $text-muted;
         padding: 0 2;
     }
+    
+    .assistant-bubble {
+        background: $surface;
+        border: round $primary;
+        padding: 1 2;
+        margin: 1 0;
+        width: 80%;
+    }
+    
+    .user-bubble {
+        background: $primary 30%;
+        border: round $secondary;
+        padding: 1 2;
+        margin: 1 0;
+        margin-left: 20%;
+        width: 80%;
+        text-align: right;
+    }
     """
 
     def __init__(self) -> None:
@@ -82,7 +103,7 @@ class InterviewScreen(Screen):
         )
 
         with Vertical(id="interview-container"):
-            yield RichLog(id="interview-log", highlight=True, markup=True)
+            yield VerticalScroll(id="interview-log")
 
         with Container(id="interview-input-container"):
             yield Input(
@@ -97,17 +118,18 @@ class InterviewScreen(Screen):
 
     async def on_mount(self) -> None:
         """Handle screen mount - start the interview."""
-        output = self.query_one("#interview-log", RichLog)
+        output = self.query_one("#interview-log", VerticalScroll)
         self.query_one("#interview-input", Input).focus()
 
         # Check for API key
         if not os.getenv("OPENAI_API_KEY"):
-            output.write("[red]Error: OPENAI_API_KEY environment variable not set.[/red]")
-            output.write("")
-            output.write("Please set your OpenAI API key:")
-            output.write("  [cyan]export OPENAI_API_KEY='your-key-here'[/cyan]")
-            output.write("")
-            output.write("Press [bold]Escape[/bold] to go back.")
+            self.notify("OPENAI_API_KEY not set", severity="error")
+            output.mount(ChatBubble(
+                "Please set your OpenAI API key:\n"
+                "  [cyan]export OPENAI_API_KEY='your-key-here'[/cyan]\n\n"
+                "Press [bold]Escape[/bold] to go back.",
+                is_user=False
+            ))
             return
 
         # Initialize interviewer
@@ -115,24 +137,23 @@ class InterviewScreen(Screen):
             from src.profile.interview import ProfileInterviewer
             self.interviewer = ProfileInterviewer()
         except Exception as e:
-            output.write(f"[red]Error initializing interviewer: {e}[/red]")
-            output.write("Press [bold]Escape[/bold] to go back.")
+            output.mount(ChatBubble(f"[red]Error initializing interviewer: {e}[/red]\nPress [bold]Escape[/bold] to go back.", is_user=False))
             return
 
         # Check for existing profile
         if profile_exists():
             existing = load_profile()
             if not existing.is_empty():
-                output.write("[yellow]You already have a profile.[/yellow]")
-                output.write(f"Completion: {existing.completion_percentage():.0f}%")
-                output.write("")
-                output.write("Starting interview will update your existing profile.")
-                output.write("")
+                msg = (
+                    "[yellow]You already have a profile.[/yellow]\n"
+                    f"Completion: {existing.completion_percentage():.0f}%\n\n"
+                    "Starting interview will update your existing profile."
+                )
+                output.mount(ChatBubble(msg, is_user=False))
 
         # Show initial message
         initial = self.interviewer.get_initial_message()
-        output.write(f"[bold cyan]Assistant:[/bold cyan] {initial}")
-        output.write("")
+        output.mount(ChatBubble(initial, is_user=False))
         self._interview_started = True
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -147,18 +168,24 @@ class InterviewScreen(Screen):
         # Clear input
         event.input.value = ""
 
-        output = self.query_one("#interview-log", RichLog)
-        output.write(f"[bold green]You:[/bold green] {user_input}")
-        output.write("")
+        output = self.query_one("#interview-log", VerticalScroll)
+        
+        # User message
+        output.mount(ChatBubble(user_input, is_user=True))
+        output.scroll_to_end(animate=False)
 
         # Show thinking indicator
-        output.write("[dim]Thinking...[/dim]")
+        thinking = ChatBubble("[dim]Thinking...[/dim]", is_user=False)
+        output.mount(thinking)
+        output.scroll_to_end(animate=False)
 
         try:
             # Process response
             response, profile = await self.interviewer.process_response(user_input)
 
-            # Remove thinking indicator (write new content)
+            # Remove thinking indicator
+            thinking.remove()
+            
             # Clean the response for display
             display_response = response
             if "[PROFILE_COMPLETE]" in display_response:
@@ -167,29 +194,32 @@ class InterviewScreen(Screen):
                 if not display_response:
                     display_response = "Great! I've created your profile."
 
-            output.write(f"[bold cyan]Assistant:[/bold cyan] {display_response}")
-            output.write("")
+            output.mount(ChatBubble(display_response, is_user=False))
+            output.scroll_to_end()
 
             if profile:
                 self.profile = profile
                 # Save the profile
                 save_profile(profile)
-                output.write("[bold green]Profile saved successfully![/bold green]")
-                output.write("")
+                self.notify("Profile saved successfully!", severity="information")
                 
                 # Show summary
                 summary = profile.get_summary()
-                output.write("[bold]Profile Summary:[/bold]")
+                summary_text = "[bold]Profile Summary:[/bold]\n"
                 for key, value in summary.items():
                     if value is not None:
-                        output.write(f"  {key}: {value}")
-                output.write("")
-                output.write("Press [bold]Escape[/bold] to return to main screen.")
+                        summary_text += f"  {key}: {value}\n"
+                summary_text += "\nPress [bold]Escape[/bold] to return to main screen."
+                
+                output.mount(ChatBubble(summary_text, is_user=False))
                 self._interview_started = False
+                output.scroll_to_end()
 
         except Exception as e:
-            output.write(f"[red]Error: {e}[/red]")
-            output.write("Please try again or press Escape to cancel.")
+            if thinking:
+                thinking.remove()
+            output.mount(ChatBubble(f"[red]Error: {e}[/red]\nPlease try again or press Escape to cancel.", is_user=False))
+            output.scroll_to_end()
 
     def action_cancel(self) -> None:
         """Cancel the interview and return to main screen."""
@@ -197,7 +227,7 @@ class InterviewScreen(Screen):
 
 
 class MatchScreen(Screen):
-    """Screen for displaying matched scholarships."""
+    """Screen for displaying matched scholarships with tabbed views."""
 
     BINDINGS = [
         ("escape", "back", "Back"),
@@ -220,9 +250,21 @@ class MatchScreen(Screen):
         text-style: bold;
     }
 
-    #match-container {
+    #match-tabs {
         height: 1fr;
-        padding: 1 2;
+        padding: 0 1;
+    }
+    
+    TabbedContent {
+        height: 100%;
+    }
+    
+    TabPane {
+        padding: 1;
+    }
+    
+    ContentSwitcher {
+        height: 100%;
     }
 
     #match-footer {
@@ -242,43 +284,67 @@ class MatchScreen(Screen):
         super().__init__()
         self._scholarships = scholarships
         self._eligible_only = eligible_only
-        self._match_container: Optional[MatchContainer] = None
+        self._best_container: Optional[MatchContainer] = None
+        self._all_container: Optional[MatchContainer] = None
 
     def compose(self) -> ComposeResult:
-        """Compose the match screen layout."""
+        """Compose the match screen layout with tabs."""
         yield Static(
             "[bold]Scholarship Matches[/bold]",
             id="match-header",
         )
 
-        self._match_container = MatchContainer(id="match-container")
-        yield self._match_container
+        # Calculate counts for tab labels
+        best_matches = [
+            s for s in self._scholarships
+            if s.get("match_result", {}).get("eligible", True) and s.get("fit_score", 0) >= 0.8
+        ]
+        
+        with Container(id="match-tabs"):
+            with TabbedContent():
+                with TabPane(f"Best Matches ({len(best_matches)})", id="tab-best"):
+                    self._best_container = MatchContainer(id="best-container")
+                    yield self._best_container
+                with TabPane(f"All Results ({len(self._scholarships)})", id="tab-all"):
+                    self._all_container = MatchContainer(id="all-container")
+                    yield self._all_container
+                with TabPane("Saved (0)", id="tab-saved"):
+                    yield Static("[dim]No saved scholarships yet.\nUse /save to export matches.[/dim]", id="saved-placeholder")
 
         yield Static(
-            "[dim]Up/Down: Navigate | Enter: View Details | Escape: Back[/dim]",
+            "[dim]Tab: Switch tabs | Up/Down: Navigate | Enter: View Details | Escape: Back[/dim]",
             id="match-footer",
         )
 
     def on_mount(self) -> None:
         """Load matches when screen mounts."""
-        if self._match_container:
-            count = self._match_container.load_matches(
-                self._scholarships,
-                eligible_only=self._eligible_only,
-            )
-            # Focus the table for keyboard navigation
-            if self._match_container.table:
-                self._match_container.table.focus()
+        # Load best matches (eligible + high fit score)
+        best_matches = [
+            s for s in self._scholarships
+            if s.get("match_result", {}).get("eligible", True) and s.get("fit_score", 0) >= 0.8
+        ]
+        if self._best_container:
+            self._best_container.load_matches(best_matches, eligible_only=False)
+        
+        # Load all matches
+        if self._all_container:
+            self._all_container.load_matches(self._scholarships, eligible_only=self._eligible_only)
+            # Focus the all table by default
+            if self._all_container.table:
+                self._all_container.table.focus()
 
     def on_match_table_row_selected(self, event: MatchTable.RowSelected) -> None:
         """Handle row selection - show detail view."""
+        # Try to find scholarship from both containers
         scholarship = None
-        if self._match_container:
-            scholarship = self._match_container.get_selected_scholarship()
+        if self._best_container:
+            scholarship = self._best_container.get_selected_scholarship()
+        if scholarship is None and self._all_container:
+            scholarship = self._all_container.get_selected_scholarship()
         
         if scholarship:
-            # Push detail screen
-            self.app.push_screen(DetailScreen(scholarship))
+            # Push detail modal
+            self.app.push_screen(DetailModal(scholarship))
 
     def action_back(self) -> None:
         """Return to main screen."""
@@ -312,7 +378,7 @@ class DetailScreen(Screen):
     #detail-container {
         height: 1fr;
         padding: 1 2;
-        border: solid $primary;
+        border: round $primary;
     }
 
     #detail-log {
@@ -497,12 +563,49 @@ class MainScreen(Screen):
     MainScreen {
         layout: grid;
         grid-size: 1;
-        grid-rows: 1fr auto auto;
+        grid-rows: auto 1fr auto auto;
+    }
+
+    #stats-bar {
+        height: 3;
+        background: $surface;
+        padding: 0 2;
+        layout: horizontal;
+        align: left middle;
+    }
+    
+    #brand-label {
+        width: auto;
+        padding: 0 2;
+        color: $primary;
+        text-style: bold;
+        content-align: center middle;
+    }
+    
+    #profile-progress {
+        width: 30;
+        margin: 0 2;
+    }
+    
+    #quick-stats {
+        width: 1fr;
+        padding: 0 2;
+        text-align: right;
+        color: $text-muted;
+        content-align: right middle;
+    }
+
+    #loading-overlay {
+        dock: top;
+        height: 100%;
+        width: 100%;
+        align: center middle;
+        background: $surface 50%;
     }
 
     #output-container {
         height: 100%;
-        border: solid $primary;
+        border: round $primary;
         padding: 1 2;
     }
 
@@ -538,6 +641,11 @@ class MainScreen(Screen):
         """Compose the main screen layout."""
         yield Header()
 
+        with Horizontal(id="stats-bar"):
+            yield Static("🎓 SCHOLARRANK", id="brand-label")
+            yield ProgressBar(total=100, show_eta=False, id="profile-progress")
+            yield Static("Loading stats...", id="quick-stats")
+
         with Vertical(id="output-container"):
             yield RichLog(id="output-log", highlight=True, markup=True)
 
@@ -560,6 +668,8 @@ class MainScreen(Screen):
         output.write("[bold cyan]SCHOLARRANK[/bold cyan] v0.1.0")
         output.write("")
         
+        self._update_stats_bar()
+        
         # Check for existing profile
         if profile_exists():
             profile = load_profile()
@@ -574,6 +684,28 @@ class MainScreen(Screen):
         else:
             output.write("Type [bold]/help[/bold] to see available commands.")
         output.write("")
+
+    def _update_stats_bar(self) -> None:
+        """Update the top stats bar."""
+        # Update profile progress
+        completion = 0
+        if profile_exists():
+            profile = load_profile()
+            completion = profile.completion_percentage()
+        
+        self.query_one("#profile-progress", ProgressBar).update(progress=completion)
+        
+        # Update scholarship stats
+        try:
+            from src.storage.database import get_session
+            from src.storage.models import Scholarship
+            from sqlalchemy import func
+            
+            for session in get_session():
+                count = session.query(func.count(Scholarship.id)).scalar() or 0
+                self.query_one("#quick-stats", Static).update(f"{count} scholarships")
+        except Exception:
+            self.query_one("#quick-stats", Static).update("Stats unavailable")
 
     def action_focus_input(self) -> None:
         """Focus the command input."""
@@ -751,8 +883,7 @@ class MainScreen(Screen):
             
             # Show match screen
             eligible_count = sum(1 for r in match_results if r.eligible)
-            output.write(f"[green]Matched {eligible_count} eligible scholarships![/green]")
-            output.write("")
+            self.notify(f"Matched {eligible_count} eligible scholarships!", severity="information")
             
             self.app.push_screen(MatchScreen(scholarships))
             
@@ -803,7 +934,7 @@ class MainScreen(Screen):
             return
         
         # Push detail screen
-        self.app.push_screen(DetailScreen(scholarship))
+        self.app.push_screen(DetailModal(scholarship))
     
     def _save_matches(self, filename: str) -> None:
         """Save matched scholarships to file.
@@ -820,8 +951,7 @@ class MainScreen(Screen):
         
         try:
             export_scholarships(self._matched_scholarships, filename)
-            output.write(f"[green]Saved {len(self._matched_scholarships)} scholarships to {filename}[/green]")
-            output.write("")
+            self.notify(f"Saved {len(self._matched_scholarships)} scholarships to {filename}", severity="information")
         except ValueError as e:
             output.write(f"[red]Error: {e}[/red]")
             output.write("Supported formats: .json, .csv, .md, .markdown")
@@ -837,125 +967,133 @@ class MainScreen(Screen):
         """Run all scrapers and save results to database."""
         output = self.query_one("#output-log", RichLog)
         
-        output.write("[bold cyan]Fetching scholarships from all sources...[/bold cyan]")
-        output.write("")
+        # Add loading indicator
+        loading = Center(LoadingIndicator(), id="loading-overlay")
+        self.mount(loading)
         
-        # Import scrapers and database
-        from src.scrapers import (
-            FastwebScraper,
-            ScholarshipsComScraper,
-            CareerOneStopScraper,
-            IEFAScraper,
-            InternationalScholarshipsComScraper,
-            Scholars4devScraper,
-        )
-        from src.storage.database import get_session
-        from src.storage.models import Scholarship, FetchLog
-        from datetime import datetime
-        import hashlib
-        
-        scrapers = [
-            ("Fastweb", FastwebScraper()),
-            ("Scholarships.com", ScholarshipsComScraper()),
-            ("CareerOneStop", CareerOneStopScraper()),
-            ("IEFA", IEFAScraper()),
-            ("InternationalScholarships", InternationalScholarshipsComScraper()),
-            ("Scholars4dev", Scholars4devScraper()),
-        ]
-        
-        total_new = 0
-        total_found = 0
-        results = []
-        
-        for source_name, scraper in scrapers:
-            output.write(f"[dim]  Fetching from {source_name}...[/dim]")
+        try:
+            output.write("[bold cyan]Fetching scholarships from all sources...[/bold cyan]")
+            output.write("")
             
-            try:
-                scholarships = await scraper.scrape()
-                count = len(scholarships)
-                total_found += count
+            # Import scrapers and database
+            from src.scrapers import (
+                FastwebScraper,
+                ScholarshipsComScraper,
+                CareerOneStopScraper,
+                IEFAScraper,
+                InternationalScholarshipsComScraper,
+                Scholars4devScraper,
+            )
+            from src.storage.database import get_session
+            from src.storage.models import Scholarship, FetchLog
+            from datetime import datetime
+            import hashlib
+            
+            scrapers = [
+                ("Fastweb", FastwebScraper()),
+                ("Scholarships.com", ScholarshipsComScraper()),
+                ("CareerOneStop", CareerOneStopScraper()),
+                ("IEFA", IEFAScraper()),
+                ("InternationalScholarships", InternationalScholarshipsComScraper()),
+                ("Scholars4dev", Scholars4devScraper()),
+            ]
+            
+            total_new = 0
+            total_found = 0
+            results = []
+            
+            for source_name, scraper in scrapers:
+                output.write(f"[dim]  Fetching from {source_name}...[/dim]")
                 
-                # Save to database
-                new_count = 0
-                for session in get_session():
-                    for s in scholarships:
-                        # Generate unique ID
-                        id_string = f"{scraper.name}:{s.get('title', '')}:{s.get('url', '')}"
-                        scholarship_id = hashlib.md5(id_string.encode()).hexdigest()[:16]
-                        
-                        # Check if exists
-                        existing = session.query(Scholarship).filter_by(id=scholarship_id).first()
-                        
-                        if existing:
-                            # Update last_seen_at
-                            existing.last_seen_at = datetime.utcnow()
-                        else:
-                            # Parse amount
-                            amount = s.get("amount")
-                            amount_min = None
-                            amount_max = None
-                            if isinstance(amount, int):
-                                amount_max = amount * 100  # Convert to cents
-                            elif isinstance(amount, str):
-                                try:
-                                    amount_max = int(amount.replace("$", "").replace(",", "")) * 100
-                                except ValueError:
-                                    pass
-                            
-                            # Create new scholarship
-                            new_scholarship = Scholarship(
-                                id=scholarship_id,
-                                source=scraper.name,
-                                source_id=s.get("source_id"),
-                                title=s.get("title", "Unknown"),
-                                description=s.get("description"),
-                                amount_min=amount_min,
-                                amount_max=amount_max,
-                                deadline=None,  # Would need to parse date
-                                application_url=s.get("url"),
-                                raw_eligibility="\n".join(s.get("requirements", [])) if s.get("requirements") else None,
-                            )
-                            session.add(new_scholarship)
-                            new_count += 1
+                try:
+                    scholarships = await scraper.scrape()
+                    count = len(scholarships)
+                    total_found += count
                     
-                    # Log the fetch
-                    fetch_log = FetchLog(
-                        source=scraper.name,
-                        scholarships_found=count,
-                        scholarships_new=new_count,
-                    )
-                    session.add(fetch_log)
-                
-                total_new += new_count
-                status = f"[green]✓[/green] {count} found, {new_count} new"
-                results.append((source_name, status, None))
-                
-            except Exception as e:
-                error_msg = str(e)[:50]
-                status = f"[red]✗[/red] Error: {error_msg}"
-                results.append((source_name, status, error_msg))
-                
-                # Log the error
-                for session in get_session():
-                    fetch_log = FetchLog(
-                        source=scraper.name,
-                        scholarships_found=0,
-                        scholarships_new=0,
-                        errors=str(e),
-                    )
-                    session.add(fetch_log)
-        
-        # Show results
-        output.write("")
-        output.write("[bold]Fetch Results:[/bold]")
-        for source_name, status, _ in results:
-            output.write(f"  {source_name}: {status}")
-        
-        output.write("")
-        output.write(f"[bold green]Total: {total_found} scholarships found, {total_new} new[/bold green]")
-        output.write("")
-        output.write("Run [bold]/match[/bold] to find scholarships matching your profile.")
-        output.write("")
+                    # Save to database
+                    new_count = 0
+                    for session in get_session():
+                        for s in scholarships:
+                            # Generate unique ID
+                            id_string = f"{scraper.name}:{s.get('title', '')}:{s.get('url', '')}"
+                            scholarship_id = hashlib.md5(id_string.encode()).hexdigest()[:16]
+                            
+                            # Check if exists
+                            existing = session.query(Scholarship).filter_by(id=scholarship_id).first()
+                            
+                            if existing:
+                                # Update last_seen_at
+                                existing.last_seen_at = datetime.utcnow()
+                            else:
+                                # Parse amount
+                                amount = s.get("amount")
+                                amount_min = None
+                                amount_max = None
+                                if isinstance(amount, int):
+                                    amount_max = amount * 100  # Convert to cents
+                                elif isinstance(amount, str):
+                                    try:
+                                        amount_max = int(amount.replace("$", "").replace(",", "")) * 100
+                                    except ValueError:
+                                        pass
+                                
+                                # Create new scholarship
+                                new_scholarship = Scholarship(
+                                    id=scholarship_id,
+                                    source=scraper.name,
+                                    source_id=s.get("source_id"),
+                                    title=s.get("title", "Unknown"),
+                                    description=s.get("description"),
+                                    amount_min=amount_min,
+                                    amount_max=amount_max,
+                                    deadline=None,  # Would need to parse date
+                                    application_url=s.get("url"),
+                                    raw_eligibility="\n".join(s.get("requirements", [])) if s.get("requirements") else None,
+                                )
+                                session.add(new_scholarship)
+                                new_count += 1
+                        
+                        # Log the fetch
+                        fetch_log = FetchLog(
+                            source=scraper.name,
+                            scholarships_found=count,
+                            scholarships_new=new_count,
+                        )
+                        session.add(fetch_log)
+                    
+                    total_new += new_count
+                    status = f"[green]✓[/green] {count} found, {new_count} new"
+                    results.append((source_name, status, None))
+                    
+                except Exception as e:
+                    error_msg = str(e)[:50]
+                    status = f"[red]✗[/red] Error: {error_msg}"
+                    results.append((source_name, status, error_msg))
+                    
+                    # Log the error
+                    for session in get_session():
+                        fetch_log = FetchLog(
+                            source=scraper.name,
+                            scholarships_found=0,
+                            scholarships_new=0,
+                            errors=str(e),
+                        )
+                        session.add(fetch_log)
+            
+            # Show results
+            output.write("")
+            output.write("[bold]Fetch Results:[/bold]")
+            for source_name, status, _ in results:
+                output.write(f"  {source_name}: {status}")
+            
+            output.write("")
+            output.write(f"[bold green]Total: {total_found} scholarships found, {total_new} new[/bold green]")
+            output.write("")
+            output.write("Run [bold]/match[/bold] to find scholarships matching your profile.")
+            output.write("")
+            
+        finally:
+            loading.remove()
 
     def _show_sources(self) -> None:
         """Show available sources and their status."""
@@ -1112,7 +1250,6 @@ class MainScreen(Screen):
                 session.delete(scholarship)
         
         if removed_count > 0:
-            output.write(f"[green]Removed {removed_count} expired scholarships.[/green]")
+            self.notify(f"Removed {removed_count} expired scholarships.", severity="information")
         else:
-            output.write("[dim]No expired scholarships found.[/dim]")
-        output.write("")
+            self.notify("No expired scholarships found.", severity="information")

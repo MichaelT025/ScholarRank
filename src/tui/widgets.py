@@ -158,16 +158,16 @@ class MatchTable(DataTable):
         
         return "Varies"
     
-    def _format_deadline(self, deadline: Any) -> str:
-        """Format deadline date."""
+    def _format_deadline(self, deadline: Any) -> Text:
+        """Format deadline date with urgency icons."""
         if deadline is None:
-            return "Open"
+            return Text("Open", style="dim")
         
         if isinstance(deadline, str):
             try:
                 deadline = date.fromisoformat(deadline)
             except ValueError:
-                return deadline[:10]
+                return Text(deadline[:10], style="dim")
         
         if isinstance(deadline, datetime):
             deadline = deadline.date()
@@ -177,15 +177,17 @@ class MatchTable(DataTable):
             days_until = (deadline - today).days
             
             if days_until < 0:
-                return "Expired"
+                return Text("⚠ Expired", style="red dim")
             elif days_until == 0:
-                return "TODAY!"
+                return Text("🔴 TODAY!", style="bold red")
             elif days_until <= 7:
-                return f"{days_until}d left"
+                return Text(f"⚠ {days_until}d left", style="bold yellow")
+            elif days_until <= 30:
+                return Text(deadline.strftime("%b %d"), style="yellow")
             else:
-                return deadline.strftime("%b %d")
+                return Text(deadline.strftime("%b %d"), style="green")
         
-        return str(deadline)[:10]
+        return Text(str(deadline)[:10], style="dim")
     
     def _format_fit_score(self, fit_score: float) -> Text:
         """Format fit score with color coding.
@@ -222,13 +224,13 @@ class MatchTable(DataTable):
         return result
     
     def _format_status(self, match_result: Dict[str, Any]) -> Text:
-        """Format eligibility status with color."""
+        """Format eligibility status with color and icons."""
         eligible = match_result.get("eligible", True)
         
         if eligible:
-            return Text("Eligible", style="green")
+            return Text("✓ Eligible", style="bold green")
         else:
-            return Text("Ineligible", style="red dim")
+            return Text("✗ Ineligible", style="red dim")
     
     def get_selected_scholarship(self) -> Optional[Dict[str, Any]]:
         """Get the currently selected scholarship."""

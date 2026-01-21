@@ -1,0 +1,65 @@
+/* Terminal Zen Theme (Tokyo Night inspired) */
+$bg: #1a1b26;
+$surface: #24283b;
+$primary: #7aa2f7;
+$secondary: #bb9af7;
+$success: #9ece6a;
+$warning: #e0af68;
+$error: #f7768e;
+$text: #c0caf5;
+$text-muted: #a9b1d6;
+
+Screen {
+    background: $bg;
+    color: $text;
+}
+
+Header {
+    background: $surface;
+    color: $text;
+    dock: top;
+    height: 1;
+}
+
+Footer {
+    background: $surface;
+    color: $text-muted;
+    dock: bottom;
+    height: 1;
+}
+
+Input {
+    background: $surface;
+    border: round $primary;
+    color: $text;
+    padding: 0 1;
+}
+
+Input:focus {
+    border: round $secondary;
+}
+
+DataTable {
+    background: $bg;
+    color: $text;
+}
+
+DataTable > .datatable--cursor {
+    background: $primary;
+    color: $bg;
+}
+
+.panel {
+    background: $bg;
+    border: round $primary;
+    padding: 1 2;
+}
+
+/* Scrollbar styling for cohesion */
+ScrollBar {
+    background: $bg;
+}
+
+ScrollBar > .scrollbar--thumb {
+    background: $surface;
+}
