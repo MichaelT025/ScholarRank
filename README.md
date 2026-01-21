@@ -6,6 +6,7 @@ A TUI application that aggregates scholarships from multiple sources, uses AI to
 
 ```bash
 pip install -e .
+playwright install chromium
 ```
 
 ## Usage
