@@ -489,6 +489,7 @@ class MainScreen(Screen):
 
     BINDINGS = [
         ("ctrl+q", "quit", "Quit"),
+        ("ctrl+c", "quit", "Quit"),
         ("escape", "focus_input", "Focus Input"),
     ]
 
@@ -496,26 +497,11 @@ class MainScreen(Screen):
     MainScreen {
         layout: grid;
         grid-size: 1;
-        grid-rows: auto 1fr auto auto;
-    }
-
-    #header-bar {
-        dock: top;
-        height: 3;
-        background: $primary;
-        color: $text;
-        content-align: center middle;
-        text-style: bold;
-    }
-
-    #profile-status {
-        dock: right;
-        width: auto;
-        padding: 0 2;
+        grid-rows: 1fr auto auto;
     }
 
     #output-container {
-        height: 1fr;
+        height: 100%;
         border: solid $primary;
         padding: 1 2;
     }
@@ -531,11 +517,10 @@ class MainScreen(Screen):
     }
 
     #command-input {
-        dock: bottom;
+        width: 100%;
     }
 
     #status-bar {
-        dock: bottom;
         height: 1;
         background: $surface;
         color: $text-muted;
@@ -563,7 +548,7 @@ class MainScreen(Screen):
             )
 
         yield Static(
-            "[dim]Type /help for commands | Ctrl+Q to quit[/dim]",
+            "[dim]Type /help for commands | Ctrl+Q/C to quit[/dim]",
             id="status-bar",
         )
         yield Footer()

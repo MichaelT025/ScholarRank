@@ -9,22 +9,63 @@ A TUI application that aggregates scholarships from multiple sources, uses AI to
 - **Fit Scoring**: Ranks scholarships based on criteria match, deadline urgency, value density, and competition.
 - **Deduplication**: Automatically identifies and merges identical scholarships across different platforms.
 
-## Installation
+## Prerequisites
+
+- Python 3.10+
+- OpenAI API key
+- Playwright browser binaries (Chromium)
+
+## Setup
 
 ```bash
+# Optional: create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Windows (PowerShell)
+# .venv\Scripts\Activate.ps1
+
+# Install dependencies in editable mode
 pip install -e .
+
+# Install Playwright browser binaries (required for scraping)
 playwright install chromium
 ```
 
-## Usage
+## Configuration
+
+ScholarRank uses the OpenAI API for profile interviews and eligibility parsing.
 
 ```bash
-# Set your OpenAI API key
+# Option 1: export directly
 export OPENAI_API_KEY='your-key-here'
 
-# Run the application
+# Option 2: create a local .env file
+cp .env.example .env
+```
+
+## Initialize and Run
+
+```bash
+# Start the TUI
 scholarrank
 ```
+
+First-run flow in the TUI:
+
+1. Run `/init` to complete the AI profile interview.
+2. Run `/fetch` to pull scholarships from all sources.
+3. Run `/match` to rank scholarships against your profile.
+4. Run `/save` to export results (JSON, CSV, or Markdown).
+
+## Usage
+
+Typical daily flow:
+
+1. `/init` if your profile changes.
+2. `/fetch` to refresh sources.
+3. `/match --limit 20` to view top results.
+4. `/save matches.csv` to export.
 
 ## Commands
 
@@ -54,6 +95,18 @@ scholarrank
 
 - Python 3.10+
 - OpenAI API key
+
+## Data Storage
+
+- `data/profile.yaml`: Your profile created by `/init`.
+- `data/scholarships.db`: Local SQLite database of scholarships.
+- `data/cache/`: LLM extraction cache for eligibility parsing.
+
+## Troubleshooting
+
+- `OPENAI_API_KEY environment variable not set`: export the key or create `.env`.
+- Scrapers failing to launch: rerun `playwright install chromium`.
+- Empty results: run `/fetch` before `/match`.
 
 ## License
 

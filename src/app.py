@@ -14,6 +14,7 @@ class ScholarRankApp(App):
 
     BINDINGS = [
         ("ctrl+q", "quit", "Quit"),
+        ("ctrl+c", "quit", "Quit"),
     ]
 
     def __init__(self) -> None:
