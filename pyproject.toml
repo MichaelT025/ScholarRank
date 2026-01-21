@@ -16,4 +16,11 @@ dependencies = [
     "pyyaml",
     "crawlee",
     "playwright",
+    "sqlalchemy>=2.0",
 ]
+
+[project.scripts]
+scholarrank = "src.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
