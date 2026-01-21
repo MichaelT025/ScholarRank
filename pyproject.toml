@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-scholarrank = "src.app:main"
+scholarrank = "scholarrank.app:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["src", "scholarrank"]
