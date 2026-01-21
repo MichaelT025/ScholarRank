@@ -267,6 +267,7 @@ Phase 7: Task 20 (Integration)
 ### Phase 1: Tasks 1-3 (Foundation)
 
 - **1. Project Setup & DependenciesWhat to do**:
+  - Status: Done
   - Create project structure with `src/`, `tests/`, `config/`, `data/` directories
   - Initialize with `pyproject.toml` (use Poetry or uv)
   - Install dependencies: textual, httpx, beautifulsoup4, lxml, openai, pyyaml, crawlee, playwright
@@ -289,6 +290,7 @@ Phase 7: Task 20 (Integration)
 ---
 
 - **2. Database Models & SetupWhat to do**:
+  - Status: Done
   - Create `src/storage/models.py` with SQLAlchemy models
   - Create `src/storage/database.py` with connection management
   - Define Scholarship table per PRD section 6.3
@@ -311,6 +313,7 @@ Phase 7: Task 20 (Integration)
 ---
 
 - **3. Basic TUI Shell with Slash CommandsWhat to do**:
+  - Status: Done
   - Create `src/app.py` as Textual application entry point
   - Create `src/tui/screens.py` with MainScreen
   - Create `src/tui/commands.py` with command parser
@@ -337,6 +340,7 @@ Phase 7: Task 20 (Integration)
 ### Phase 2: Tasks 4-5 (Profile System)
 
 - **4. Profile Data ModelsWhat to do**:
+  - Status: Done
   - Create `src/profile/models.py` with Pydantic models for profile
   - Define all profile fields: academic, location, demographics, financial, interests, affiliations
   - Create `src/config.py` for loading/saving profile to YAML
@@ -357,6 +361,7 @@ Phase 7: Task 20 (Integration)
 ---
 
 - **5. LLM-Powered Profile InterviewWhat to do**:
+  - Status: Done
   - Create `src/profile/interview.py` with interview logic
   - Use OpenAI API to conduct conversational interview
   - Extract structured profile from conversation
@@ -383,6 +388,7 @@ Phase 7: Task 20 (Integration)
 ### Phase 3: Tasks 6-12 (Scrapers)
 
 - **6. Base Scraper ClassWhat to do**:
+  - Status: Done
   - Create `src/scrapers/base.py` with abstract BaseScraper class
   - Define interface: `fetch()`, `parse()`, `name`, `url`
   - Add rate limiting (configurable delay between requests)
