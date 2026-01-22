@@ -598,25 +598,30 @@ class ChatScreen(Screen):
             
             for i, (name, scraper_class) in enumerate(scrapers):
                 self.post_message(FetchStartSource(index=i, name=name))
+                source_key = name.lower().replace(".", "_").replace(" ", "_")
+                count = 0
+                new_count = 0
                 
                 try:
                     scraper = scraper_class()
                     scholarships = await scraper.scrape()
                     count = len(scholarships) if scholarships else 0
-                    new_count = 0
                     
                     # Save scholarships to database
                     import hashlib
-                    source_key = name.lower().replace(".", "_").replace(" ", "_")
                     for s in scholarships:
                         # Generate unique ID from source + url or title
                         id_base = f"{source_key}:{s.get('url') or s.get('title', '')}"
                         scholarship_id = hashlib.sha256(id_base.encode()).hexdigest()[:64]
                         
                         # Parse amount (handle int, string like "$5,000", or range)
-                        amount = s.get("amount", 0)
+                        amount = s.get("amount")
+                        if amount is None:
+                            amount = 0
                         if isinstance(amount, str):
                             amount = int("".join(c for c in amount if c.isdigit()) or "0")
+                        elif not isinstance(amount, (int, float)):
+                            amount = 0
                         amount_cents = amount * 100 if amount < 10000 else amount  # Assume < 10000 is dollars
                         
                         # Parse deadline
@@ -671,6 +676,19 @@ class ChatScreen(Screen):
                     
                 except Exception as e:
                     logger.error(f"Fetch error for {name}: {e}")
+                    try:
+                        session.rollback()
+                        fetch_log = FetchLog(
+                            source=source_key,
+                            fetched_at=datetime.now(),
+                            scholarships_found=count,
+                            scholarships_new=new_count,
+                            errors=str(e),
+                        )
+                        session.add(fetch_log)
+                        session.commit()
+                    except Exception as log_error:
+                        logger.error(f"Failed to record fetch error for {name}: {log_error}")
                     self.post_message(FetchSourceError(index=i, name=name, error=str(e)))
             
             # Get count after
@@ -812,10 +830,16 @@ class ChatScreen(Screen):
             lines = [f"[green]Found {len(eligible)} eligible matches out of {len(scholarships_data)} total[/green]", ""]
             lines.append("[dim]Click links to open in browser[/dim]")
             lines.append("")
+            
+            from rich.markup import escape as markup_escape
                     
             # Display top matches
             for i, s in enumerate(eligible[:limit], 1):
                 score_pct = int(s["fit_score"] * 100)
+                # Safely get match percentage
+                match_res = s.get("match_result", {})
+                match_pct = int(match_res.get("match_percentage", 0))
+                
                 if score_pct >= 80:
                     score_style = "#10b981"  # Emerald
                 elif score_pct >= 60:
@@ -826,21 +850,30 @@ class ChatScreen(Screen):
                 amount = self._format_amount(s.get("amount_min"), s.get("amount_max"))
                 deadline = s.get("deadline", "Open")[:10] if s.get("deadline") else "Open"
                 url = s.get("application_url", "")
+                title = markup_escape(s['title'][:50])
+                safe_url = ""
+                if url:
+                    safe_url = (
+                        url.replace("\"", "%22")
+                        .replace("[", "%5B")
+                        .replace("]", "%5D")
+                    )
                 
                 # Title line - make it a clickable link if URL exists
                 if url:
-                    lines.append(f"[bold][link={url}]{i}. {s['title'][:50]}[/link][/bold]")
+                    lines.append(f"[bold][link=\"{safe_url}\"]{i}. {title}[/link][/bold]")
                 else:
-                    lines.append(f"[bold]{i}. {s['title'][:50]}[/bold]")
+                    lines.append(f"[bold]{i}. {title}[/bold]")
                 
-                lines.append(f"   [{score_style}]{score_pct}% fit[/{score_style}] | {amount} | Deadline: {deadline}")
+                lines.append(f"   [{score_style}]{score_pct}% fit[/{score_style}] | Match: {match_pct}% | {amount} | Deadline: {deadline}")
                 
                 # Source and URL line
                 source_line = f"   [dim]{s.get('source', 'Unknown')}[/dim]"
                 if url:
-                    # Truncate long URLs for display
+                    # Truncate long URLs for display, escape for markup
                     display_url = url if len(url) <= 50 else url[:47] + "..."
-                    source_line += f" • [link={url}][cyan]{display_url}[/cyan][/link]"
+                    display_url_escaped = markup_escape(display_url)
+                    source_line += f" • [link=\"{safe_url}\"][cyan]{display_url_escaped}[/cyan][/link]"
                 lines.append(source_line)
             
             if len(eligible) > limit:
