@@ -1,16 +1,17 @@
-/* ScholarRank - OpenCode-inspired minimal theme */
+/* ScholarRank - Premium Carbon & Gold Theme */
 
-/* Color palette - dark terminal aesthetic */
-$bg: #0d1117;
-$surface: #161b22;
-$border: #30363d;
-$text: #c9d1d9;
-$text-muted: #8b949e;
-$primary: #58a6ff;
-$secondary: #a371f7;
-$success: #3fb950;
-$warning: #d29922;
-$error: #f85149;
+/* Color palette - Premium Dark Aesthetic */
+$bg: #0f1012;         /* Deepest Obsidian */
+$surface: #1a1b1e;    /* Rich Dark Grey */
+$border: #2c2e33;     /* Subtle Blue-Grey Border */
+$text: #e4e5e7;       /* Platinum Text */
+$text-muted: #717682; /* Muted Metal */
+$primary: #d4af37;    /* Metallic Gold */
+$secondary: #a0a0a0;  /* Brushed Silver */
+$success: #10b981;    /* Emerald */
+$warning: #f59e0b;    /* Amber */
+$error: #ef4444;      /* Ruby Red */
+$accent-glow: #d4af37; /* For subtle glows */
 
 /* Base screen */
 Screen {
@@ -28,11 +29,12 @@ ChatScreen {
 #header {
     dock: top;
     height: 1;
-    background: $surface;
+    background: $bg;
     color: $primary;
     text-style: bold;
     padding: 0 1;
-    border-bottom: solid $border;
+    border-bottom: solid $primary;
+    text-align: center;
 }
 
 /* Progress Bar */
@@ -41,12 +43,14 @@ ChatScreen {
     display: none;
     height: 1;
     background: $surface;
-    padding: 0 1;
+    padding: 0 0;
     margin: 0;
+    border-bottom: solid $border;
 }
 
 #interview-progress Bar {
-    color: $success;
+    color: $primary;
+    background: $surface;
 }
 
 #interview-progress.visible {
@@ -57,8 +61,7 @@ ChatScreen {
 #chat-log {
     background: $bg;
     padding: 1 0;
-    scrollbar-gutter: stable;
-    scrollbar-size: 1 1;
+    scrollbar-size: 0 0;
 }
 
 #chat-log:focus {
@@ -72,22 +75,26 @@ ChatBubble {
     margin: 1 2;
     background: $surface;
     color: $text;
+    border-left: wide $border;
 }
 
 .user-bubble {
-    background: #1f2937;
-    border: solid #58a6ff;
+    background: #2c2e33;
+    border-left: wide $primary;
     border-top: none;
     border-right: none;
     border-bottom: none;
+    text-align: left;
+    margin-right: 15;
 }
 
 .assistant-bubble {
-    background: #2d2335;
-    border: solid #a371f7;
+    background: #1a1b1e;
+    border-left: wide $secondary;
     border-top: none;
     border-right: none;
     border-bottom: none;
+    margin-right: 15;
 }
 
 .system-message {
@@ -95,6 +102,7 @@ ChatBubble {
     color: $text-muted;
     padding: 0 1;
     margin: 1 0;
+    text-style: italic;
 }
 
 .message {
@@ -107,25 +115,72 @@ ChatBubble {
     dock: bottom;
     height: auto;
     padding-bottom: 0;
+    background: $bg;
+    border-top: solid $border;
+}
+
+/* Command Suggestions */
+CommandList {
+    width: 100%;
+    height: auto;
+    max-height: 12;
+    background: $surface;
+    border-top: solid $primary;
+    border-bottom: none;
+    display: none;
+    layer: overlay; /* Ensure it sits on top if we use layers */
+}
+
+CommandList.visible {
+    display: block;
+}
+
+/* OptionList Styling */
+OptionList {
+    background: $surface;
+    border: none;
+    padding: 0;
+    height: auto;
+    max-height: 10;
+}
+
+OptionList > .option-list--option {
+    padding: 0 2;
+    background: $surface;
+    color: $text-muted;
+}
+
+OptionList > .option-list--option-highlighted {
+    background: $primary;
+    color: $bg;
+    text-style: bold;
+}
+
+OptionList > .option-list--option-hover {
+    background: $surface;
+    color: $text;
 }
 
 /* Tips */
 #tips {
     text-align: center;
     color: $text-muted;
-    padding: 0 0 1 0;
+    padding: 1 0;
+    background: $bg;
 }
 
 /* Input */
 #input {
-    margin: 0 3 1 3;
+    margin: 1 2;
+    height: 3; /* Larger height */
     background: $surface;
-    border: tall $border;
+    border: solid $border;
     padding: 0 1;
+    color: $text;
 }
 
 #input:focus {
-    border: tall $primary;
+    border: solid $primary;
 }
 
 #input > .input--placeholder {
@@ -134,8 +189,68 @@ ChatBubble {
 
 /* RichLog styling */
 RichLog {
-    scrollbar-background: $surface;
+    scrollbar-background: $bg;
     scrollbar-color: $border;
     scrollbar-color-hover: $text-muted;
     scrollbar-color-active: $primary;
+}
+
+/* Welcome / Empty State */
+.welcome-container {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    text-align: center;
+    padding: 2;
+}
+
+.welcome-logo {
+    color: $primary;
+    text-style: bold;
+    margin-bottom: 1;
+    text-align: center;
+}
+
+.welcome-subtitle {
+    color: $secondary;
+    text-style: bold;
+    margin-bottom: 2;
+    text-align: center;
+}
+
+.welcome-footer {
+    margin-top: 2;
+    text-align: center;
+    color: $text-muted;
+}
+
+.welcome-box {
+    background: $surface;
+    border: solid $border;
+    padding: 1 2;
+    margin: 1 0;
+    width: 60;
+    text-align: left;
+}
+
+/* Specific styling for command outputs in logs */
+.command-output-success {
+    color: $success;
+}
+
+.command-output-error {
+    color: $error;
+}
+
+.command-output-warning {
+    color: $warning;
+}
+
+/* Fetch Progress Widget */
+FetchProgress {
+    background: $surface;
+    margin: 1 2;
+    padding: 0;
+    height: auto;
+    max-width: 56;
 }
