@@ -106,8 +106,10 @@ ChatBubble {
 }
 
 .message {
-    padding: 0 2;
-    margin: 0 0 1 0;
+    padding: 1 2;
+    margin: 1 2;
+    background: #141517;
+    border-left: wide $success;
 }
 
 /* Input Container */
