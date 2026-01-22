@@ -16,4 +16,5 @@ data/*.sqlite3
 data/*.yaml
 
 .sisyphus/
+data/
 AGENTS.md
