@@ -544,6 +544,8 @@ The application runs as an **interactive TUI** (not a one-shot CLI). Users inter
 /save my-scholarships.json   Save matches to JSON file
 /save --format md        Save as Markdown table
 
+/apikey <key>            Set OpenAI API key (saves to .env)
+
 /stats                   Show database statistics
 /clean                   Remove expired scholarships
 /quit                    Exit the application

@@ -1,16 +1,16 @@
 """ScholarRank TUI Application entry point."""
 
+from dotenv import load_dotenv
 from textual.app import App
 
 from src.storage.database import init_db
-from src.tui.screens import MainScreen
+from src.tui.screens import ChatScreen
 
 
 class ScholarRankApp(App):
     """Main TUI application for ScholarRank."""
 
     TITLE = "ScholarRank"
-    SUB_TITLE = "Scholarship Matching Tool"
     CSS_PATH = "tui/app.tcss"
 
     BINDINGS = [
@@ -24,12 +24,13 @@ class ScholarRankApp(App):
         init_db()
 
     def on_mount(self) -> None:
-        """Push the main screen when app mounts."""
-        self.push_screen(MainScreen())
+        """Push the chat screen when app mounts."""
+        self.push_screen(ChatScreen())
 
 
 def main() -> None:
     """Entry point for the application."""
+    load_dotenv()
     app = ScholarRankApp()
     app.run()
 

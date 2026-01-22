@@ -10,6 +10,8 @@ from src.profile.models import UserProfile
 # Default paths
 DATA_DIR = Path(__file__).parent.parent / "data"
 DEFAULT_PROFILE_PATH = DATA_DIR / "profile.yaml"
+INTERVIEW_DRAFT_PATH = DATA_DIR / "interview_draft.json"
+PROFILE_DRAFT_PATH = DATA_DIR / "profile_draft.yaml"
 
 
 def ensure_data_dir() -> None:

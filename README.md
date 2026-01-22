@@ -38,10 +38,14 @@ playwright install chromium
 ScholarRank uses the OpenAI API for profile interviews and eligibility parsing.
 
 ```bash
-# Option 1: export directly
+# Option 1: Set via TUI command (recommended)
+scholarrank
+# Then run: /apikey sk-your-key-here
+
+# Option 2: export directly
 export OPENAI_API_KEY='your-key-here'
 
-# Option 2: create a local .env file
+# Option 3: create a local .env file
 cp .env.example .env
 ```
 
@@ -70,18 +74,19 @@ Typical daily flow:
 
 ## Commands
 
-| Command        | Description                                 |
-| -------------- | ------------------------------------------- |
-| `/init`        | Create/update your profile via AI interview |
-| `/profile`     | Show current profile                        |
-| `/fetch`       | Fetch scholarships from all sources         |
-| `/sources`     | Show scholarship sources and status         |
-| `/stats`       | Show database statistics                    |
-| `/clean`       | Remove expired scholarships from database   |
-| `/match`       | Find matching scholarships                  |
-| `/save [file]` | Export matches to JSON/CSV/Markdown         |
-| `/help`        | Show all commands                           |
-| `/quit`        | Exit                                        |
+| Command         | Description                                 |
+| --------------- | ------------------------------------------- |
+| `/init`         | Create/update your profile via AI interview |
+| `/profile`      | Show current profile                        |
+| `/fetch`        | Fetch scholarships from all sources         |
+| `/sources`      | Show scholarship sources and status         |
+| `/stats`        | Show database statistics                    |
+| `/clean`        | Remove expired scholarships from database   |
+| `/match`        | Find matching scholarships                  |
+| `/save [file]`  | Export matches to JSON/CSV/Markdown         |
+| `/apikey <key>` | Set OpenAI API key                          |
+| `/help`         | Show all commands                           |
+| `/quit`         | Exit                                        |
 
 ## Supported Sources
 
@@ -105,7 +110,7 @@ Typical daily flow:
 
 ## Troubleshooting
 
-- `OPENAI_API_KEY environment variable not set`: export the key or create `.env`.
+- `OPENAI_API_KEY environment variable not set`: run `/apikey sk-your-key` or export the key.
 - Scrapers failing to launch: rerun `playwright install chromium`.
 - Empty results: run `/fetch` before `/match`.
 

@@ -11,6 +11,7 @@ class CommandType(Enum):
     HELP = auto()
     QUIT = auto()
     INIT = auto()
+    RESUME = auto()
     PROFILE = auto()
     FETCH = auto()
     SOURCES = auto()
@@ -19,6 +20,7 @@ class CommandType(Enum):
     SAVE = auto()
     STATS = auto()
     CLEAN = auto()
+    APIKEY = auto()
     UNKNOWN = auto()
 
 
@@ -46,6 +48,7 @@ class CommandParser:
         "/exit": CommandType.QUIT,
         "/q": CommandType.QUIT,
         "/init": CommandType.INIT,
+        "/resume": CommandType.RESUME,
         "/profile": CommandType.PROFILE,
         "/fetch": CommandType.FETCH,
         "/sources": CommandType.SOURCES,
@@ -54,6 +57,7 @@ class CommandParser:
         "/save": CommandType.SAVE,
         "/stats": CommandType.STATS,
         "/clean": CommandType.CLEAN,
+        "/apikey": CommandType.APIKEY,
     }
 
     HELP_TEXT = """
@@ -61,6 +65,7 @@ Available Commands:
   /help              Show this help message
   /quit, /exit, /q   Exit the application
   /init              Run LLM interview to create/update profile
+  /resume            Resume an interrupted interview
   /profile           Show current profile
   /fetch             Fetch scholarships from all sources
   /sources           List available sources and status
@@ -69,12 +74,14 @@ Available Commands:
   /save [filename]   Save matches to file (JSON, CSV, or MD)
   /stats             Show database statistics
   /clean             Remove expired scholarships
+  /apikey <key>      Set OpenAI API key
 
 Keyboard Shortcuts:
-  Ctrl+Q             Quit application
+  Ctrl+Q             Quit the application
+  Ctrl+C             Quit the application
   Up/Down            Navigate list
   Enter              View selected item
-"""
+  """
 
     def parse(self, input_text: str) -> CommandResult:
         """Parse a command string.

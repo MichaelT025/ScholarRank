@@ -64,11 +64,12 @@ Let's start with the basics - what's your name, and can you tell me about your c
 class ProfileInterviewer:
     """Conducts an LLM-powered interview to build a user profile."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, draft_path: Optional[str] = None):
         """Initialize the interviewer.
 
         Args:
             api_key: OpenAI API key. If not provided, uses OPENAI_API_KEY env var.
+            draft_path: Optional path for saving/loading interview drafts.
         """
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
@@ -79,10 +80,54 @@ class ProfileInterviewer:
         self.client = AsyncOpenAI(api_key=self.api_key)
         self.conversation_history: list[dict] = []
         self.max_turns = 10  # Maximum conversation turns before forcing completion
+        self.draft_path = draft_path or "data/interview_draft.json"
+        self.auto_save = True  # Auto-save after each turn
 
     def reset(self) -> None:
         """Reset the conversation history."""
         self.conversation_history = []
+
+    def save_draft(self) -> None:
+        """Save conversation history to draft file."""
+        try:
+            with open(self.draft_path, "w") as f:
+                json.dump({
+                    "conversation_history": self.conversation_history,
+                    "saved_at": __import__("datetime").datetime.now().isoformat(),
+                }, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Failed to save interview draft: {e}")
+
+    def load_draft(self) -> bool:
+        """Load conversation history from draft file.
+
+        Returns:
+            True if draft was loaded successfully.
+        """
+        try:
+            if not os.path.exists(self.draft_path):
+                return False
+
+            with open(self.draft_path, "r") as f:
+                data = json.load(f)
+
+            self.conversation_history = data.get("conversation_history", [])
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to load interview draft: {e}")
+            return False
+
+    def clear_draft(self) -> None:
+        """Remove the draft file if it exists."""
+        try:
+            if os.path.exists(self.draft_path):
+                os.remove(self.draft_path)
+        except Exception as e:
+            logger.warning(f"Failed to clear interview draft: {e}")
+
+    def draft_exists(self) -> bool:
+        """Check if an interview draft exists."""
+        return os.path.exists(self.draft_path)
 
     def get_initial_message(self) -> str:
         """Get the initial interview message."""
@@ -144,6 +189,108 @@ class ProfileInterviewer:
         except Exception as e:
             logger.error(f"Error calling OpenAI API: {e}")
             raise
+
+    async def process_response_streaming(self, user_message: str):
+        """Process a user response with streaming output.
+
+        Args:
+            user_message: The user's response.
+
+        Yields:
+            Tuples of (chunk_type, content) where:
+            - ("chunk", str): A text chunk from the response
+            - ("done", (full_message, profile_or_none)): Final result
+        """
+        # Add user message to history
+        self.conversation_history.append({
+            "role": "user",
+            "content": user_message,
+        })
+
+        # Check if we should force completion
+        force_complete = len(self.conversation_history) >= self.max_turns * 2
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            *self.conversation_history,
+        ]
+
+        if force_complete:
+            messages.append({
+                "role": "system",
+                "content": "The interview has gone on long enough. Please output [PROFILE_COMPLETE] with the JSON profile based on what you've learned so far.",
+            })
+
+        try:
+            stream = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1000,
+                stream=True,
+            )
+
+            full_message = ""
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    full_message += content
+                    yield ("chunk", content)
+
+            # Add to history
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": full_message,
+            })
+
+            # Check if profile is complete
+            profile = None
+            if "[PROFILE_COMPLETE]" in full_message:
+                profile = self._extract_profile(full_message)
+                # Clear draft on successful completion
+                self.clear_draft()
+
+            # Auto-save after each turn
+            if self.auto_save:
+                self.save_draft()
+
+            # Yield final result
+            yield ("done", (full_message, profile))
+
+        except Exception as e:
+            logger.error(f"Error calling OpenAI API: {e}")
+            raise
+
+    async def extract_partial_profile(self) -> Optional[UserProfile]:
+        """Extract a partial profile from the current conversation.
+
+        Useful for saving progress during an interview.
+
+        Returns:
+            UserProfile with whatever information could be extracted, or None.
+        """
+        messages = [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT + "\n\nExtract a PARTIAL profile from the conversation so far. Output [PROFILE_COMPLETE] with the JSON immediately. Use null for unknown fields.",
+            },
+            *self.conversation_history,
+        ]
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.3,
+                max_tokens=1000,
+            )
+
+            assistant_message = response.choices[0].message.content or ""
+            return self._extract_profile(assistant_message)
+
+        except Exception as e:
+            logger.warning(f"Failed to extract partial profile: {e}")
+            return None
 
     def _extract_profile(self, message: str) -> Optional[UserProfile]:
         """Extract profile from the completion message.

@@ -13,6 +13,7 @@ dependencies = [
     "beautifulsoup4",
     "lxml",
     "openai",
+    "python-dotenv",
     "pyyaml",
     "crawlee",
     "playwright",
