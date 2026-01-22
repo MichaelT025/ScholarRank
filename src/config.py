@@ -12,6 +12,7 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 DEFAULT_PROFILE_PATH = DATA_DIR / "profile.yaml"
 INTERVIEW_DRAFT_PATH = DATA_DIR / "interview_draft.json"
 PROFILE_DRAFT_PATH = DATA_DIR / "profile_draft.yaml"
+DEFAULT_MATCHES_PATH = DATA_DIR / "matches.csv"
 
 
 def ensure_data_dir() -> None:

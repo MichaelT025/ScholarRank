@@ -15,7 +15,7 @@ from textual.message import Message
 from textual.worker import Worker, WorkerState
 
 from src.tui.commands import CommandParser, CommandType
-from src.config import load_profile, save_profile, profile_exists, INTERVIEW_DRAFT_PATH
+from src.config import load_profile, save_profile, profile_exists, INTERVIEW_DRAFT_PATH, DEFAULT_MATCHES_PATH, ensure_data_dir
 from src.tui.components import ChatLog, FetchProgress, CommandSuggestionList
 from textual import events
 
@@ -603,12 +603,66 @@ class ChatScreen(Screen):
                     scraper = scraper_class()
                     scholarships = await scraper.scrape()
                     count = len(scholarships) if scholarships else 0
+                    new_count = 0
+                    
+                    # Save scholarships to database
+                    import hashlib
+                    source_key = name.lower().replace(".", "_").replace(" ", "_")
+                    for s in scholarships:
+                        # Generate unique ID from source + url or title
+                        id_base = f"{source_key}:{s.get('url') or s.get('title', '')}"
+                        scholarship_id = hashlib.sha256(id_base.encode()).hexdigest()[:64]
+                        
+                        # Parse amount (handle int, string like "$5,000", or range)
+                        amount = s.get("amount", 0)
+                        if isinstance(amount, str):
+                            amount = int("".join(c for c in amount if c.isdigit()) or "0")
+                        amount_cents = amount * 100 if amount < 10000 else amount  # Assume < 10000 is dollars
+                        
+                        # Parse deadline
+                        deadline_val = None
+                        if s.get("deadline"):
+                            try:
+                                from dateutil import parser as dateparser
+                                deadline_val = dateparser.parse(str(s["deadline"])).date()
+                            except Exception:
+                                pass
+                        
+                        # Convert requirements list to string
+                        raw_elig = s.get("requirements", [])
+                        if isinstance(raw_elig, list):
+                            raw_elig = "\n".join(str(r) for r in raw_elig)
+                        
+                        # Check if exists
+                        existing = session.query(Scholarship).filter_by(id=scholarship_id).first()
+                        if existing:
+                            # Update last_seen_at
+                            existing.last_seen_at = datetime.now()
+                        else:
+                            # Insert new
+                            new_scholarship = Scholarship(
+                                id=scholarship_id,
+                                source=source_key,
+                                source_id=s.get("source_id"),
+                                title=s.get("title", "")[:500],
+                                description=s.get("description"),
+                                amount_min=amount_cents,
+                                amount_max=amount_cents,
+                                deadline=deadline_val,
+                                application_url=s.get("url"),
+                                raw_eligibility=raw_elig or None,
+                            )
+                            session.add(new_scholarship)
+                            new_count += 1
+                    
+                    session.commit()
                     
                     # Log fetch
                     fetch_log = FetchLog(
-                        source=name.lower().replace(".", "_").replace(" ", "_"),
+                        source=source_key,
                         fetched_at=datetime.now(),
                         scholarships_found=count,
+                        scholarships_new=new_count,
                     )
                     session.add(fetch_log)
                     session.commit()
@@ -756,6 +810,8 @@ class ChatScreen(Screen):
                     limit = int(arg)
 
             lines = [f"[green]Found {len(eligible)} eligible matches out of {len(scholarships_data)} total[/green]", ""]
+            lines.append("[dim]Click links to open in browser[/dim]")
+            lines.append("")
                     
             # Display top matches
             for i, s in enumerate(eligible[:limit], 1):
@@ -769,10 +825,23 @@ class ChatScreen(Screen):
                 
                 amount = self._format_amount(s.get("amount_min"), s.get("amount_max"))
                 deadline = s.get("deadline", "Open")[:10] if s.get("deadline") else "Open"
+                url = s.get("application_url", "")
                 
-                lines.append(f"[bold]{i}. {s['title'][:50]}[/bold]")
+                # Title line - make it a clickable link if URL exists
+                if url:
+                    lines.append(f"[bold][link={url}]{i}. {s['title'][:50]}[/link][/bold]")
+                else:
+                    lines.append(f"[bold]{i}. {s['title'][:50]}[/bold]")
+                
                 lines.append(f"   [{score_style}]{score_pct}% fit[/{score_style}] | {amount} | Deadline: {deadline}")
-                lines.append(f"   [dim]{s.get('source', 'Unknown')}[/dim]")
+                
+                # Source and URL line
+                source_line = f"   [dim]{s.get('source', 'Unknown')}[/dim]"
+                if url:
+                    # Truncate long URLs for display
+                    display_url = url if len(url) <= 50 else url[:47] + "..."
+                    source_line += f" • [link={url}][cyan]{display_url}[/cyan][/link]"
+                lines.append(source_line)
             
             if len(eligible) > limit:
                 lines.append(f"[dim]...and {len(eligible) - limit} more. Use /match --limit=N to see more.[/dim]")
@@ -852,7 +921,20 @@ class ChatScreen(Screen):
             log.write("[#f59e0b]No profile found. Run /init and /match first.[/f59e0b]")
             return
 
-        filename = args[0] if args else "matches.json"
+        # Default to data/matches.csv
+        if args:
+            filename = args[0]
+            # If just a filename without path, put it in data/
+            from pathlib import Path
+            filepath = Path(filename)
+            if not filepath.parent.name:  # No directory specified
+                ensure_data_dir()
+                filepath = DEFAULT_MATCHES_PATH.parent / filename
+        else:
+            ensure_data_dir()
+            filepath = DEFAULT_MATCHES_PATH
+        
+        filename = str(filepath)
         
         # Determine format from extension
         if filename.endswith(".csv"):
@@ -912,15 +994,25 @@ class ChatScreen(Screen):
                 with open(filename, "w") as f:
                     json.dump(eligible, f, indent=2, default=str)
             elif fmt == "csv":
-                with open(filename, "w", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=["title", "source", "fit_score", "deadline", "application_url"])
+                with open(filename, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=["title", "fit_score", "amount", "deadline", "source", "application_url"])
                     writer.writeheader()
                     for s in eligible:
+                        # Format amount
+                        amount = ""
+                        if s.get("amount_max"):
+                            dollars = s["amount_max"] // 100
+                            amount = f"${dollars:,}"
+                        elif s.get("amount_min"):
+                            dollars = s["amount_min"] // 100
+                            amount = f"${dollars:,}+"
+                        
                         writer.writerow({
                             "title": s["title"],
-                            "source": s["source"],
                             "fit_score": f"{int(s['fit_score'] * 100)}%",
+                            "amount": amount or "Varies",
                             "deadline": s["deadline"] or "Open",
+                            "source": s["source"],
                             "application_url": s["application_url"] or "",
                         })
             elif fmt == "markdown":

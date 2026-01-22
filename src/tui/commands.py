@@ -61,26 +61,26 @@ class CommandParser:
     }
 
     HELP_TEXT = """
-Available Commands:
-  /help              Show this help message
-  /quit, /exit, /q   Exit the application
-  /init              Run LLM interview to create/update profile
-  /resume            Resume an interrupted interview
-  /profile           Show current profile
-  /fetch             Fetch scholarships from all sources
-  /sources           List available sources and status
-  /match             Find matching scholarships
-  /info <id>         Show detailed scholarship info
-  /save [filename]   Save matches to file (JSON, CSV, or MD)
-  /stats             Show database statistics
-  /clean             Remove expired scholarships
-  /apikey <key>      Set OpenAI API key
+[bold #d4af37]Available Commands:[/bold #d4af37]
+  [bold #10b981]/help[/bold #10b981]              Show this help message
+  [bold #10b981]/quit[/bold #10b981], /exit, /q   Exit the application
+  [bold #10b981]/init[/bold #10b981]              Run LLM interview to create/update profile
+  [bold #10b981]/resume[/bold #10b981]            Resume an interrupted interview
+  [bold #10b981]/profile[/bold #10b981]           Show current profile
+  [bold #10b981]/fetch[/bold #10b981]             Fetch scholarships from all sources
+  [bold #10b981]/sources[/bold #10b981]           List available sources and status
+  [bold #10b981]/match[/bold #10b981]             Find matching scholarships
+  [bold #10b981]/info <id>[/bold #10b981]         Show detailed scholarship info
+  [bold #10b981]/save [filename][/bold #10b981]   Save matches to file (JSON, CSV, or MD)
+  [bold #10b981]/stats[/bold #10b981]             Show database statistics
+  [bold #10b981]/clean[/bold #10b981]             Remove expired scholarships
+  [bold #10b981]/apikey <key>[/bold #10b981]      Set OpenAI API key
 
-Keyboard Shortcuts:
-  Ctrl+Q             Quit the application
-  Ctrl+C             Quit the application
-  Up/Down            Navigate list
-  Enter              View selected item
+[bold #d4af37]Keyboard Shortcuts:[/bold #d4af37]
+  [bold #a0a0a0]Ctrl+Q[/bold #a0a0a0]             Quit the application
+  [bold #a0a0a0]Ctrl+C[/bold #a0a0a0]             Quit the application
+  [bold #a0a0a0]Up/Down[/bold #a0a0a0]            Navigate list
+  [bold #a0a0a0]Enter[/bold #a0a0a0]              View selected item
   """
 
     def parse(self, input_text: str) -> CommandResult:

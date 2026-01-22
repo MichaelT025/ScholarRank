@@ -4,7 +4,7 @@ A TUI application that aggregates scholarships from multiple sources, uses AI to
 
 ## Key Features
 
-- **Modern TUI**: Beautiful terminal interface with a "Zen" theme, tabbed views, and interactive modals.
+- **Modern TUI**: Premium terminal interface with a sophisticated "Carbon & Gold" theme, tabbed views, and interactive modals.
 - **AI-Powered Interview**: Conversational chat interface to build your profile naturally.
 - **Smart Matching**: Evaluates eligibility with hard and soft filters (GPA, citizenship, major, etc.).
 - **Fit Scoring**: Ranks scholarships based on criteria match, deadline urgency, value density, and competition.
@@ -61,7 +61,7 @@ First-run flow in the TUI:
 1. Run `/init` to complete the AI profile interview.
 2. Run `/fetch` to pull scholarships from all sources.
 3. Run `/match` to view ranked scholarships in a tabbed interface.
-4. Run `/save` to export results (JSON, CSV, or Markdown).
+4. Run `/save` to export results to `data/matches.csv`.
 
 ## Usage
 
@@ -70,7 +70,7 @@ Typical daily flow:
 1. `/init` if your profile changes.
 2. `/fetch` to refresh sources.
 3. `/match --limit 20` to view top results.
-4. `/save matches.csv` to export.
+4. `/save` to export (defaults to `data/matches.csv`).
 
 ## Commands
 
@@ -83,7 +83,7 @@ Typical daily flow:
 | `/stats`        | Show database statistics                    |
 | `/clean`        | Remove expired scholarships from database   |
 | `/match`        | Find matching scholarships                  |
-| `/save [file]`  | Export matches to JSON/CSV/Markdown         |
+| `/save [file]`  | Export matches (default: data/matches.csv)  |
 | `/apikey <key>` | Set OpenAI API key                          |
 | `/help`         | Show all commands                           |
 | `/quit`         | Exit                                        |
@@ -106,6 +106,7 @@ Typical daily flow:
 
 - `data/profile.yaml`: Your profile created by `/init`.
 - `data/scholarships.db`: Local SQLite database of scholarships.
+- `data/matches.csv`: Exported scholarship matches from `/save`.
 - `data/cache/`: LLM extraction cache for eligibility parsing.
 
 ## Troubleshooting
