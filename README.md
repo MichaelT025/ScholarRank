@@ -108,12 +108,14 @@ Typical daily flow:
 - `data/scholarships.db`: Local SQLite database of scholarships.
 - `data/matches.csv`: Exported scholarship matches from `/save`.
 - `data/cache/`: LLM extraction cache for eligibility parsing.
+- `data/fetch_errors.log`: Application log containing errors and warnings.
 
 ## Troubleshooting
 
 - `OPENAI_API_KEY environment variable not set`: run `/apikey sk-your-key` or export the key.
 - Scrapers failing to launch: rerun `playwright install chromium`.
 - Empty results: run `/fetch` before `/match`.
+- Persistent errors: check `data/fetch_errors.log` for detailed diagnostics.
 
 ## License
 

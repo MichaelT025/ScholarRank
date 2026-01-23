@@ -13,6 +13,7 @@ DEFAULT_PROFILE_PATH = DATA_DIR / "profile.yaml"
 INTERVIEW_DRAFT_PATH = DATA_DIR / "interview_draft.json"
 PROFILE_DRAFT_PATH = DATA_DIR / "profile_draft.yaml"
 DEFAULT_MATCHES_PATH = DATA_DIR / "matches.csv"
+FETCH_ERRORS_LOG_PATH = DATA_DIR / "fetch_errors.log"
 
 
 def ensure_data_dir() -> None:
